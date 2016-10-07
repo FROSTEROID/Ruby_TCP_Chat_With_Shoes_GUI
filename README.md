@@ -3,9 +3,9 @@ Yeah, my own TCP chat with GUI and Shoes. No encryption yet though. :\
 
 <To harvest goods, You need a tool; to spread corruption, You need a tool; to send a message, You need a tool>
 
-USAGE:
-$shoes Server.rb
-$shoes Client.rb
+USAGE:<br>
+$shoes Server.rb <br>
+$shoes Client.rb 
 
 NOTE:
 Yeah, You need to install(unpack and make accessible) Shoes to be able to use this code. Or reinvent Shoes, which way is Yours is not a problem of mine.
