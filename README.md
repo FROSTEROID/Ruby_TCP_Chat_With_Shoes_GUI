@@ -1,7 +1,7 @@
 # Ruby_TCP_Chat_With_Shoes_GUI
 Yeah, my own TCP chat with GUI and Shoes. No encryption yet though. :\
 
-<To harvest goods, You need a tool; to spread corruption, You need a tool; to send a message, You need a tool>
+"To harvest goods, You need a tool; to spread corruption, You need a tool; to send a message, You need a tool"
 
 USAGE:<br>
 $shoes Server.rb <br>
