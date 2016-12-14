@@ -1,3 +1,4 @@
+#!/usr/bin/ruby
 require 'socket'
 
 $CLIENTS_COUNT_MAX = 10
