@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 require 'socket'
 
-$CLIENTS_COUNT_MAX = 10
-
 $PORT_SERVICE = 5599
 
 #0-close; 1-open; 2-connected;
