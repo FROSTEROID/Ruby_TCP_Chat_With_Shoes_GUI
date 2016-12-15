@@ -187,7 +187,8 @@ $SessionFtSockets = []
     end
     
     @btn_sendFile.click {
-        Thread.new { BroadcastFile(ask_open_file, -1) }
+        filename = ask_open_file;
+        Thread.new { BroadcastFile(filename, -1) }
     }
 
     @el_msg.finish = proc {
