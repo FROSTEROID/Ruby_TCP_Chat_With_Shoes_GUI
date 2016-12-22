@@ -11,7 +11,6 @@
 #   losing connection,
 #   maybe something else later...
 
-
 class ChatSession
     
     attr_writer :OnMsgReceived
@@ -19,6 +18,7 @@ class ChatSession
     attr_writer :OnFileReceived
     attr_writer :OnMsgConnectionLost
     attr_writer :OnFtConnectionLost
+    attr_writer :OnShitHappened
     
     def initialize msgSocket=nil, ftSocket=nil
         if (msgSocket == nil)
@@ -29,7 +29,6 @@ class ChatSession
         end
         @msgSocket = msgSocket
         @ftSocket = ftSocket
-        puts "looks legit!"
     end
 
     def StartTheWork
@@ -50,39 +49,44 @@ class ChatSession
     end
 
     def FtThreadProc
-        while msg = @ftSocket.gets    # Read lines from socket
-            
-            # the 1st line brings the size
-            fileLength = msg.to_i
-            
-            # the 2nd line brings the name
-            if (!(filename = @ftSocket.gets))
-                raise "FileTransfer has died right after sending the length."
-            end
-            
-            filename = filename.gsub!("\n", " ").squeeze(' ')
-            f = @OnFileSavePathNeeded.call(filename, fileLength)
-            
-            acquiredLength = 0
-            while (acquiredLength < fileLength)
-                if (!(filePart= @ftSocket.gets))
+        begin
+            while msg = @ftSocket.gets    # Read lines from socket
+                
+                # the 1st line brings the size
+                fileLength = msg.to_i
+                
+                # the 2nd line brings the name
+                if (!(filename = @ftSocket.gets))
+                    raise "FileTransfer has died right after sending the length."
+                end
+                
+                filename = filename.gsub!("\n", " ").squeeze(' ')
+                f = @OnFileSavePathNeeded.call(filename, fileLength)
+                
+                acquiredLength = 0
+                while (acquiredLength < fileLength)
+                    if (!(filePart= @ftSocket.gets))
+                        break
+                    end
+                    acquiredLength += filePart.size
+                    f.write(filePart)
+                end
+                f.flush()
+                f.close()
+                
+                if(acquiredLength < fileLength)
+                    @ftSocket.close()
+                    raise "FileTransfer has died trying to send a filename."
                     break
                 end
-                acquiredLength += filePart.size
-                f.write(filePart)
+                @OnFileReceived.call()
             end
-            f.flush()
-            f.close()
+            @ftSocket.close()
+            @OnFtConnectionLost.call()
             
-            if(acquiredLength < fileLength)
-                @ftSocket.close()
-                raise "FileTransfer has died trying to send a filename."
-                break
-            end
-            @OnFileReceived.call()
+        rescue StandardError => ex
+            OnShitHappened.call(ex)
         end
-        @ftSocket.close()
-        @OnFtConnectionLost.call()
     end
     
     def SendMessage (msg)

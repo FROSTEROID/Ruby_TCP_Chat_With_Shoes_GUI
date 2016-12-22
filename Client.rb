@@ -1,6 +1,10 @@
 #!/usr/bin/ruby
 require 'socket'
 
+$RELEASE = true
+
+load("ChatSession.rb")
+
 $PORT_SERVICE = 5599
 
 #0-close; 1-open; 2-connected;
@@ -10,9 +14,8 @@ $clientsState = 0
 $MsgPort = 0 #Port for text messages (just to make it available for dbg, not using as global in routines)
 $FtPort = 0#Port for file transfering (just to make it available for dbg, not using as global in routines)
 
-$FtSocket = nil
 $MsgSocket = nil
-
+$FtSocket = nil
 
  Shoes.app do
     @el_ipaddress = edit_line "127.0.0.1"
@@ -52,78 +55,36 @@ $MsgSocket = nil
         #Let the tcp magic happen and let the server get the listeners up
         sleep 1
         
-        @sessionMsgThread = Thread.new{
-            SessionMsgThreadProc(hostname, $MsgPort)
-        }        
-        @sessionFtThread = Thread.new{
-            SessionFtThreadProc(hostname, $FtPort)
-        }
-    end
-
-    def SessionMsgThreadProc(hostname, port)
-        $MsgSocket= TCPSocket.open(hostname, port)
-        $clientsState = 2
-        DebugLog("CONNECTED TO THE MESSAGE CHAT!")
-        while msg = $MsgSocket.gets # Read lines from socket
+        $MsgSocket= TCPSocket.open(hostname, $MsgPort)
+        
+        $FtSocket = TCPSocket.open(hostname, $FtPort)
+        
+        $session = ChatSession.new $MsgSocket, $FtSocket
+        
+        $session.OnMsgReceived = lambda{
+            |msg|  
             @eb_dialog.text = msg + @eb_dialog.text
-        end
-        $MsgSocket.close()
-        $clientsState = 0
-    end
-
-    def SessionFtThreadProc(hostname, port)
-        begin
-        DebugLog("Trying to connect to FT port "+port.to_s)
-        # Create a server for listening
-        $FtSocket = TCPSocket.open(hostname, port)
-        # Log the connection event
-        DebugLog("FT CONNECTED.")
-        info ($FtSocket.addr(false))
-        # Await for files to come and die
-        while msg = $FtSocket.gets    # Read lines from socket
-            info(msg)
-            streamLength = msg.to_i
-            acquiredLength = 0
-            DebugLog("FileTransfer incoming! Size is #{streamLength}")
-            
-            filename = $FtSocket.gets
-            info(filename)
-            filename = filename.gsub!("\n", " ").squeeze(' ')
-            DebugLog("Saving to "+filename+".")
-            
-            f = File.new(filename, "w")
-            while(acquiredLength < streamLength)
-                filePart= $FtSocket.gets
-                DebugLog("Got a string! #{filePart}")
-                acquiredLength += filePart.size
-                f.write(filePart)
-                
-                #DebugLog("FileTransfer has died sending the stream.")
-                #$MsgSocket.close()
-                #$clientsState = 0
-                
-            end
-            f.flush()
-            f.close()
+        }
+        $session.OnFileSavePathNeeded =  lambda { 
+            |filename, fileLength|
+            DebugLog("A file incoming! #{filename} of #{fileLength} bytes!")
+            return File.open(filename, "w")
+        }
+        $session.OnFileReceived = lambda {
+            DebugLog("Downloaded the file!")
+        }
+        $session.OnMsgConnectionLost = lambda {
+            DebugLog("MSG died. :(")
+        }
+        $session.OnFtConnectionLost = lambda {
+            DebugLog("FT died. :(")
+        }
+        $session.OnShitHappened = lambda {
+            |ex|
+            DebugLog(ex)
+        }
         
-            DebugLog("FileTransfer has died trying to send a filename.")
-            $MsgSocket.close()
-            $clientsState = 0
-            break
-            
-        
-            #DebugLog("FileTransfer has died trying to send a filename.")
-            #$MsgSocket.close()
-            #$clientsState = 0
-            #break
-            
-        end
-        rescue errorr
-           info(errorr) 
-        end
-        DebugLog("FileTransfer has died.")
-        # Aaaaand close the socket
-        @SessionFtSocket.close()
+        $session.StartTheWork()
     end
 
     @btn_connect.click {
@@ -132,9 +93,10 @@ $MsgSocket = nil
         }                                    
     }
     
-    @el_msg.finish = proc { 
-        $MsgSocket.puts @el_msg.text
-        @eb_dialog.text = "(me) " + @el_msg.text + "\n" + @eb_dialog.text
+    @el_msg.finish = proc {
+        msg = @el_msg.text
+        $session.SendMessage(msg)
+        @eb_dialog.text = "(me) " + msg + "\n" + @eb_dialog.text
         @el_msg.text = ""
     }
     

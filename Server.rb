@@ -176,7 +176,7 @@ $SessionFtSockets = []
                 curSock.puts fName.to_s
                 curSock.flush
                 fContent.each do |fline|
-                   DebugLog("Sending data(#{fline.size}) to client "+ @curClientID.to_s + "")
+                   #DebugLog("Sending data(#{fline.size}) to client "+ @curClientID.to_s + "")
                    curSock.puts fline
                 end
             else
