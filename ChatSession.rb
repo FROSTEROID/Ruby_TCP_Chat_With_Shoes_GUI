@@ -14,7 +14,7 @@
 class ChatSession
     
     attr_writer :OnMsgReceived
-    attr_writer :OnFileSavePathNeeded
+    attr_writer :OnFileSaveHandlerNeeded
     attr_writer :OnFileReceived
     attr_writer :OnMsgConnectionLost
     attr_writer :OnFtConnectionLost
@@ -61,7 +61,7 @@ class ChatSession
                 end
                 
                 filename = filename.gsub!("\n", " ").squeeze(' ')
-                f = @OnFileSavePathNeeded.call(filename, fileLength)
+                f = @OnFileSaveHandlerNeeded.call(filename, fileLength)
                 
                 acquiredLength = 0
                 while (acquiredLength < fileLength)

@@ -65,7 +65,7 @@ $FtSocket = nil
             |msg|  
             @eb_dialog.text = msg + @eb_dialog.text
         }
-        $session.OnFileSavePathNeeded =  lambda { 
+        $session.OnFileSaveHandlerNeeded =  lambda { 
             |filename, fileLength|
             DebugLog("A file incoming! #{filename} of #{fileLength} bytes!")
             return File.open(filename, "w")
