@@ -17,9 +17,10 @@ class ChatSession
     attr_writer :OnMsgReceived
     attr_writer :OnFileSavePathNeeded
     attr_writer :OnFileReceived
-    attr_writer :OnConnectionLost
+    attr_writer :OnMsgConnectionLost
+    attr_writer :OnFtConnectionLost
     
-    public def initialize msgSocket=nil, ftSocket=nil
+    def initialize msgSocket=nil, ftSocket=nil
         if (msgSocket == nil)
             raise "ChatSession initialization faild. msgSocket is nil!"
         end
@@ -30,8 +31,8 @@ class ChatSession
         @ftSocket = ftSocket
         puts "looks legit!"
     end
-    
-    public def StartTheWork
+
+    def StartTheWork
         @msgThread = Thread.new{
             MsgThreadProc()
         }
@@ -39,62 +40,122 @@ class ChatSession
             FtThreadProc()
         }
     end
-    
-    def MsgThreadProc()
+
+    def MsgThreadProc
         while msg = @msgSocket.gets # Read lines from socket
-            OnMsgReceived(msg)
+            @OnMsgReceived.call(msg)
         end
         @msgSocket.close()
-        
-        OnConnectionLost()
+        @OnMsgConnectionLost.call()
     end
-    
-    def FtThreadProc()
+
+    def FtThreadProc
         while msg = @ftSocket.gets    # Read lines from socket
-            info(msg)
-            streamLength = msg.to_i
-            acquiredLength = 0
-            DebugLog("FileTransfer incoming! Size is #{streamLength}")
             
-            filename = @ftSocket.gets
-            info(filename)
+            # the 1st line brings the size
+            fileLength = msg.to_i
+            
+            # the 2nd line brings the name
+            if (!(filename = @ftSocket.gets))
+                raise "FileTransfer has died right after sending the length."
+            end
+            
             filename = filename.gsub!("\n", " ").squeeze(' ')
-            DebugLog("Saving to "+filename+".")
+            f = @OnFileSavePathNeeded.call(filename, fileLength)
             
-            f = File.new(filename, "w")
-            while(acquiredLength < streamLength)
-                filePart= @ftSocket.gets
-                DebugLog("Got a string! #{filePart}")
+            acquiredLength = 0
+            while (acquiredLength < fileLength)
+                if (!(filePart= @ftSocket.gets))
+                    break
+                end
                 acquiredLength += filePart.size
                 f.write(filePart)
             end
             f.flush()
             f.close()
-        
-            DebugLog("FileTransfer has died trying to send a filename.")
-            $clientsState = 0
-            break
+            
+            if(acquiredLength < fileLength)
+                @ftSocket.close()
+                raise "FileTransfer has died trying to send a filename."
+                break
+            end
+            @OnFileReceived.call()
         end
         @ftSocket.close()
+        @OnFtConnectionLost.call()
     end
     
+    def SendMessage (msg)
+        @msgSocket.puts msg
+    end
+    
+    def SendFile (file)
+        @fSize = File.stat(filePath).size
+        @fName = File.basename(filePath)
+        @f = File.new(filePath, "r")
+        @fContent = IO.readlines(filePath)
+        @ftSocket.puts fSize
+        @ftSocket.puts fName.to_s
+        @ftSocket.flush
+        fContent.each do |fline|
+            @ftSocket.puts fline
+        end
+    end
+
 end
 
-
-
 if($RELEASE != "True")
-    begin
-    session = ChatSession.new
+    begin      
+        #0-close; 1-open; 2-connected;
+        $clientsState = 0
+        require 'socket'
+        $PORT_SERVICE = 5599
+        
+        @MsgPort = 0 #Port for text messages (just to make it available for dbg, not using as global in routines)
+        @FtPort = 0  #Port for file transfering (just to make it available for dbg, not using as global in routines)
+
+        @FtSocket = nil
+        @MsgSocket = nil
+    
+        hostname = "127.0.0.1"
+        
+        $clientsState = 1
+        @initSocket = TCPSocket.open(hostname, $PORT_SERVICE)
+        @gotMsgPort = false;
+        @gotFtPort = false;
+        while msg = @initSocket.gets    # Read lines from socket
+            if(!@gotMsgPort)
+                @MsgPort = msg.to_i
+                @gotMsgPort = true
+            else
+                @FtPort = msg.to_i
+            break
+            end
+        end
+        # Close the socket when done
+        @initSocket.close()
+        
+        #Let the tcp magic happen and let the server get the listeners up
+        sleep 1
+        
+        @MsgSocket= TCPSocket.open(hostname, @MsgPort)
+        @FtSocket = TCPSocket.open(hostname, @FtPort)
+        
+        
+        $session = ChatSession.new @MsgSocket, @FtSocket
+        $session.OnMsgReceived = lambda{|msg| puts msg}
+        $session.StartTheWork()
+        
     rescue StandardError => ex
         puts ex
     end
     
 
-    puts session
+    puts $session
 end
 
 
-    #PORT_SERVICE_DEFAULT = 5599
+#PORT_SERVICE_DEFAULT = 5599
 #Read on:
 # http://zetcode.com/lang/rubytutorial/oop2/
 # http://awaxman11.github.io/blog/2013/08/05/what-is-the-difference-between-a-block/
