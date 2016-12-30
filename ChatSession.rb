@@ -5,11 +5,8 @@
 
 # On initialization 
 #  it needs to be passed two sockets for messages and for files
-#  and also handlers for 
-#   accepting messages,
-#   accepting files,
-#   losing connection,
-#   maybe something else later...
+#  and also handlers for different events
+
 
 class ChatSession
     
@@ -115,8 +112,8 @@ if($RELEASE != "True")
         require 'socket'
         $PORT_SERVICE = 5599
         
-        @MsgPort = 0 #Port for text messages (just to make it available for dbg, not using as global in routines)
-        @FtPort = 0  #Port for file transfering (just to make it available for dbg, not using as global in routines)
+        @MsgPort = 0 #Port for text messages
+        @FtPort = 0  #Port for file transfering 
 
         @FtSocket = nil
         @MsgSocket = nil
